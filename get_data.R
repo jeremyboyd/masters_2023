@@ -1,11 +1,11 @@
 # Author: Jeremy Boyd (jeremyboyd@pm.me)
-# Description: Scrapes Master's leaderboard data and writes to a Google sheet.
+# Description: Scrape Masters leaderboard data every ten minutes and write to a
+# Google sheet.
 
 # Packages
 library(tidyverse)
 library(RSelenium)          # Selenium server
 library(rvest)              # Web scraping
-# library(jsonlite)
 library(googlesheets4)
 
 # Interactive authorization puts token in secrets. This only has to be done
