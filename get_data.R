@@ -14,13 +14,13 @@ library(lubridate)
 # gs4_auth(email = "kenyonboyd@gmail.com", cache = ".secrets")
 # gs4_deauth()
 
-# Authorize access to Google sheets
-gs4_auth(email = "kenyonboyd@gmail.com",
-         cache = ".secrets")
-
 # Scrape this page
 url <- "https://2022.masters.com/en_US/scores/index.html"
 # https://www.masters.com/en_US/scores/index.html
+
+# Authorize access to Google sheets
+gs4_auth(email = "kenyonboyd@gmail.com",
+         cache = ".secrets")
 
 # Start Docker
 system("open --background -a Docker", wait = TRUE)
@@ -44,12 +44,12 @@ Sys.sleep(5)
 message(paste0("Finished navigating to ", url, "."))
 
 # The leaderboard page has two different types of boards: "Traditional" (which
-# is what we want), and "Over/Under". When the page first loads it's set to
+# is what we want), and "Over/Under". When the page first loads, it's set to
 # Over/Under. The code below (1) finds the drop-down menu that controls the type
-# of leaderboard and clicks on it to reveal the "Over/Under" and "Traditional"
-# options, then (2) finds the "Traditional" option and clicks on it. This loads
-# the traditional table, which can then be scraped. Once this process is
-# completed, the page can be refreshed and will stay on the traditional table.
+# of leaderboard and clicks it to reveal the "Over/Under" and "Traditional"
+# options, then (2) finds the "Traditional" option and clicks it. This loads the
+# traditional table, which can then be scraped. Once this process is completed,
+# the page can be refreshed and will stay on the traditional table.
 # Click to open menu
 webElems <- remDr$findElements(
     using = "xpath",
@@ -74,7 +74,7 @@ while (TRUE) {
     
     # Refresh page
     remDr$refresh()
-    Sys.sleep(5)
+    Sys.sleep(6)
     message("Page refresh complete.")
     
     # Leaderboard doesn't seem to be structured as a table. Instead, read in all
@@ -86,7 +86,12 @@ while (TRUE) {
         html_text2()
     
     # Convert character string to a table by first finding the indices of player
-    # names
+    # names.
+    # NOTE: This could break if there's a player name that's less than two
+    # characters, of if other characters are introduced into the leaderboard.
+    # Currently only missed cut (MC) and withdrawn (WD) are at least two
+    # characters. One character uses are "T", as in "T3" (tied for third place),
+    # and "F" (finished).
     name_idx <- which(str_detect(leader_char, "^[A-Za-z]{2}") &
                           !str_detect(leader_char, "^(MC|WD)"))
     
