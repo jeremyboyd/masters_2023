@@ -7,66 +7,69 @@ library(tidyverse)
 library(RSelenium)          # Selenium server
 library(rvest)              # Web scraping
 library(googlesheets4)
+library(lubridate)
 
 # Interactive authorization puts token in secrets. This only has to be done
-# once.
+# once when the script is first run.
 # gs4_auth(email = "kenyonboyd@gmail.com", cache = ".secrets")
 # gs4_deauth()
 
-# Authorize access to google sheets
+# Authorize access to Google sheets
 gs4_auth(email = "kenyonboyd@gmail.com",
          cache = ".secrets")
 
 # Scrape this page
 url <- "https://2022.masters.com/en_US/scores/index.html"
+# https://www.masters.com/en_US/scores/index.html
 
-# remDr$getCurrentUrl()
+# Start Docker
+system("open --background -a Docker", wait = TRUE)
+Sys.sleep(40)
+message("Finished starting Docker.")
+
+# Start Selenium
+system("docker run -d -p 4445:4444 selenium/standalone-firefox", wait = TRUE)
+message("Finished starting Selenium server.")
+
+# Connect to server
+remDr <- remoteDriver(port = 4445L)
+Sys.sleep(5)
+remDr$open()
+Sys.sleep(5)
+message("Finished connecting to server.")
+
+# Navigate to URL and wait for page to load
+remDr$navigate(url)
+Sys.sleep(5)
+message(paste0("Finished navigating to ", url, "."))
+
+# The leaderboard page has two different types of boards: "Traditional" (which is what we want), and "Over/Under". When the page first loads it's set to Over/Under. The code below (1) finds the drop-down menu and clicks on it to reveal the "Over/Under" and "Traditional" options, then (2) finds the "Traditional" option and clicks on it. This loads the traditional table, which can then be scraped. Once this process is completed, the page can be refreshed and will stay on the traditional table.
+# Click to open menu
+webElems <- remDr$findElements(
+    using = "xpath",
+    value = '//*[contains(concat( " ", @class, " " ), concat( " ", "select-menu-tabs2dropdown", " " ))]//*[contains(concat( " ", @class, " " ), concat( " ", "navigation_down_arrow", " " ))]')
+resHeaders <- unlist(lapply(webElems, function(x) { x$getElementText() }))
+target <- webElems[[which(resHeaders == "Over/Under")]]
+target$clickElement()
+
+# Click to select traditional table
+webElems <- remDr$findElements(
+    using = "xpath",
+    value = '//*[contains(concat( " ", @class, " " ), concat( " ", "option", " " )) and (((count(preceding-sibling::*) + 1) = 2) and parent::*)]')
+resHeaders <- unlist(lapply(webElems, function(x) { x$getElementText() }))
+target <- webElems[[which(resHeaders == "Traditional")]]
+target$clickElement()
 
 # Scrape leaderboard every 10 minutes and send to Google sheet
 while (TRUE) {
-        
+    
     # User message
-    print(paste("Initiating leaderboard refresh at", Sys.time()))
+    message(paste("Initiating leaderboard refresh at", Sys.time()))
     
-    # Start Docker
-    system("open --background -a Docker", wait = TRUE)
-    Sys.sleep(30)
-    message("Finished starting Docker.")
-    
-    # Start Selenium
-    system("docker run -d -p 4445:4444 selenium/standalone-firefox", wait = TRUE)
-    message("Finished starting Selenium server.")
-    
-    # Connect to server
-    remDr <- remoteDriver(port = 4445L)
+    # Refresh page
+    remDr$refresh()
     Sys.sleep(5)
-    remDr$open()
-    Sys.sleep(5)
-    message("Finished connecting to server.")
-    
-    # Navigate to URL and wait for page to load
-    remDr$navigate(url)
-    Sys.sleep(5)
-    message(paste0("Finished navigating to ", url, "."))
-    
-    # Click drop-down to choose betwen over/under (default) and traditional
-    # tables.
-    webElems <- remDr$findElements(
-        using = "xpath",
-        value = '//*[contains(concat( " ", @class, " " ), concat( " ", "select-menu-tabs2dropdown", " " ))]//*[contains(concat( " ", @class, " " ), concat( " ", "navigation_down_arrow", " " ))]')
-    resHeaders <- unlist(lapply(webElems, function(x) { x$getElementText() }))
-    # resHeaders
-    target <- webElems[[which(resHeaders == "Over/Under")]]
-    target$clickElement()
-    
-    # Click to get traditional table
-    webElems <- remDr$findElements(
-        using = "xpath",
-        value = '//*[contains(concat( " ", @class, " " ), concat( " ", "option", " " )) and (((count(preceding-sibling::*) + 1) = 2) and parent::*)]')
-    resHeaders <- unlist(lapply(webElems, function(x) { x$getElementText() }))
-    # resHeaders
-    target <- webElems[[which(resHeaders == "Traditional")]]
-    target$clickElement()
+    message("Page refresh complete.")
     
     # Leaderboard doesn't seem to be structured as a table. Instead, read in all
     # data elements as a character string.
@@ -97,7 +100,8 @@ while (TRUE) {
     colnames(leader_tab) <- c("place", "player", "total_under", "thru", "today_under", "R1", "R2", "R3", "R4", "total_score")
     
     # Fix rows for players who missed the cut
-    # NOTE: Could break if a different number of players are allowed to make the cut
+    # NOTE: Could break if a different number of players are allowed to make the
+    # cut
     leaderboard <- bind_rows(
         
         # These rows are okay
@@ -115,21 +119,20 @@ while (TRUE) {
         mutate(
             across(c("total_under", "today_under"),
                    ~ if_else(.x == "E", "0", .x)),
-        across(
-            c("total_under", "today_under", R1:total_score), ~ as.integer(.x)),
-        last_updated = Sys.time())
+            across(
+                c("total_under", "today_under", R1:total_score), ~ as.integer(.x)),
+            
+            # Add a datetime stamp. Google sheets converts all datetimes to UTC,
+            # so subtract six hours to show mountain time.
+            last_updated = Sys.time() - hours(6))
     
-    # Write to google sheet
-    # Write sheet
+    # Write to Google sheet
     write_sheet(
         data = leaderboard,
         ss = "1-Mq_xMxERqTPUnSerpig5NU9oDVj4a09KFH1WSSedBw",
         sheet = "leaderboard")
-
-    # Delete session, close browser, close Docker
-    # remDr$quit()
-    system("killall Docker", wait = TRUE)
     
     # Pause 600 seconds before running loop again
+    message("Waiting for next loop...")
     Sys.sleep(600)
 }
