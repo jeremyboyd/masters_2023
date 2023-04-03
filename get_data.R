@@ -43,7 +43,13 @@ remDr$navigate(url)
 Sys.sleep(5)
 message(paste0("Finished navigating to ", url, "."))
 
-# The leaderboard page has two different types of boards: "Traditional" (which is what we want), and "Over/Under". When the page first loads it's set to Over/Under. The code below (1) finds the drop-down menu and clicks on it to reveal the "Over/Under" and "Traditional" options, then (2) finds the "Traditional" option and clicks on it. This loads the traditional table, which can then be scraped. Once this process is completed, the page can be refreshed and will stay on the traditional table.
+# The leaderboard page has two different types of boards: "Traditional" (which
+# is what we want), and "Over/Under". When the page first loads it's set to
+# Over/Under. The code below (1) finds the drop-down menu that controls the type
+# of leaderboard and clicks on it to reveal the "Over/Under" and "Traditional"
+# options, then (2) finds the "Traditional" option and clicks on it. This loads
+# the traditional table, which can then be scraped. Once this process is
+# completed, the page can be refreshed and will stay on the traditional table.
 # Click to open menu
 webElems <- remDr$findElements(
     using = "xpath",
