@@ -1,5 +1,5 @@
 # Author: Jeremy Boyd (jeremyboyd@pm.me)
-# Description: Scrape Masters leaderboard data every ten minutes and write to a
+# Description: Scrape Masters leaderboard data every 60 seconds and write to a
 # Google sheet.
 
 # Packages
@@ -51,9 +51,6 @@ message(paste0("Finished navigating to ", url, "."))
 # traditional table, which can then be scraped. Once this process is completed,
 # the page can be refreshed and will stay on the traditional table.
 # Click to open menu
-# webElems <- remDr$findElements(
-#     using = "xpath",
-#     value = '//*[contains(concat( " ", @class, " " ), concat( " ", "select-menu-tabs2dropdown", " " ))]//*[contains(concat( " ", @class, " " ), concat( " ", "navigation_down_arrow", " " ))]')
 webElems <- remDr$findElements(
     using = "xpath",
     value = '//*[contains(concat( " ", @class, " " ), concat( " ", "center_cell", " " ))]//*[contains(concat( " ", @class, " " ), concat( " ", "navigation_down_arrow", " " ))]')
@@ -158,7 +155,7 @@ while (TRUE) {
         ss = "1-Mq_xMxERqTPUnSerpig5NU9oDVj4a09KFH1WSSedBw",
         sheet = "leaderboard")
     
-    # Pause 600 seconds before running loop again
+    # Pause 60 seconds before running loop again
     message("Waiting for next loop...")
-    Sys.sleep(600)
+    Sys.sleep(60)
 }
