@@ -15,8 +15,8 @@ library(lubridate)
 # gs4_deauth()
 
 # Scrape this page
-url <- "https://2022.masters.com/en_US/scores/index.html"
-# https://www.masters.com/en_US/scores/index.html
+url <- "https://www.masters.com/en_US/scores/index.html"
+# url <- "https://2022.masters.com/en_US/scores/index.html"
 
 # Authorize access to Google sheets
 gs4_auth(email = "kenyonboyd@gmail.com",
@@ -51,9 +51,12 @@ message(paste0("Finished navigating to ", url, "."))
 # traditional table, which can then be scraped. Once this process is completed,
 # the page can be refreshed and will stay on the traditional table.
 # Click to open menu
+# webElems <- remDr$findElements(
+#     using = "xpath",
+#     value = '//*[contains(concat( " ", @class, " " ), concat( " ", "select-menu-tabs2dropdown", " " ))]//*[contains(concat( " ", @class, " " ), concat( " ", "navigation_down_arrow", " " ))]')
 webElems <- remDr$findElements(
     using = "xpath",
-    value = '//*[contains(concat( " ", @class, " " ), concat( " ", "select-menu-tabs2dropdown", " " ))]//*[contains(concat( " ", @class, " " ), concat( " ", "navigation_down_arrow", " " ))]')
+    value = '//*[contains(concat( " ", @class, " " ), concat( " ", "center_cell", " " ))]//*[contains(concat( " ", @class, " " ), concat( " ", "navigation_down_arrow", " " ))]')
 resHeaders <- unlist(lapply(webElems, function(x) { x$getElementText() }))
 target <- webElems[[which(resHeaders == "Over/Under")]]
 target$clickElement()
@@ -86,14 +89,13 @@ while (TRUE) {
         html_text2()
     
     # Convert character string to a table by first finding the indices of player
-    # names.
-    # NOTE: This could break if there's a player name that's less than two
-    # characters, of if other characters are introduced into the leaderboard.
-    # Currently only missed cut (MC) and withdrawn (WD) are at least two
-    # characters. One character uses are "T", as in "T3" (tied for third place),
-    # and "F" (finished).
+    # names. Player names are considered to be at least two alpha characters,
+    # but not MC (missed cut), WD (withdrawn), or GMT (Greenwich Mean Time,
+    # giving tee times for players who haven't started yet). Requiring at least
+    # two characters allows us to miss T (used for ties, like tied for third,
+    # "T3") and F (finished).
     name_idx <- which(str_detect(leader_char, "^[A-Za-z]{2}") &
-                          !str_detect(leader_char, "^(MC|WD)"))
+                          !str_detect(leader_char, "^(MC|WD|GMT)"))
     
     # Based on where player names occur, we can compute the indices for the
     # start and end of each row in the table.
@@ -110,28 +112,41 @@ while (TRUE) {
     # Add column names
     colnames(leader_tab) <- c("place", "player", "total_under", "thru", "today_under", "R1", "R2", "R3", "R4", "total_score")
     
-    # Fix rows for players who missed the cut
-    # NOTE: Could break if a different number of players are allowed to make the
-    # cut
+    # There are different methods for fixing rows, depending on where in the
+    # tournament we are. If there's no place data, then the player hasn't teed
+    # off yet, so only keep their name.
+    not_started <- leader_tab %>%
+        filter(place == "") %>%
+        select(player)
+    
+    # If the place is either MC or WD then only keep place, player, R1, R2, and
+    # total score.
+    mc_wd <- leader_tab %>%
+        filter(place %in% c("MC", "WD")) %>%
+        select(place, player, thru, today_under, R3) %>%
+        rename(
+            R1 = thru,
+            R2 = today_under,
+            total_score = R3)
+
+    # Final leaderboard
     leaderboard <- bind_rows(
         
         # These rows are okay
-        leader_tab[1:52, ],
+        leader_tab %>%
+            filter(!place %in% c("MC", "WD", "")),
         
-        # Fix these rows
-        leader_tab[53:nrow(leader_tab), ] %>%
-            select(place, player, thru, today_under, R3) %>%
-            rename(
-                R1 = thru,
-                R2 = today_under,
-                total_score = R3)) %>%
+        # These are the rows we had to fix
+        not_started,
+        mc_wd) %>%
         
         # Convert to numeric
         mutate(
             across(c("total_under", "today_under"),
                    ~ if_else(.x == "E", "0", .x)),
             across(
-                c("total_under", "today_under", R1:total_score), ~ as.integer(.x)),
+                c("total_under", "today_under", R1:total_score),
+                ~ as.integer(.x)),
             
             # Add a datetime stamp. Google sheets converts all datetimes to UTC,
             # so subtract six hours to show mountain time.
