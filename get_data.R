@@ -1,5 +1,5 @@
 # Author: Jeremy Boyd (jeremyboyd@pm.me)
-# Description: Scrape Masters leaderboard data every 60 seconds and write to a
+# Description: Scrape Masters leaderboard data every 120 seconds and write to a
 # Google sheet.
 
 # Packages
@@ -155,7 +155,7 @@ while (TRUE) {
         ss = "1-Mq_xMxERqTPUnSerpig5NU9oDVj4a09KFH1WSSedBw",
         sheet = "leaderboard")
     
-    # Pause 60 seconds before running loop again
+    # Pause 120 seconds before running loop again
     message("Waiting for next loop...")
-    Sys.sleep(60)
+    Sys.sleep(120)
 }
