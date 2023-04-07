@@ -112,10 +112,18 @@ while (TRUE) {
     # There are different methods for fixing rows, depending on where in the
     # tournament we are. If there's no place data, then the player hasn't teed
     # off yet, so only keep their name.
+    # NOTE: Only works for not started round 1
+    # not_started <- leader_tab %>%
+    #     filter(place == "") %>%
+    #     select(player)
+
+    # NOTE: This will only work for R3/4 if the start time stays in thru col
     not_started <- leader_tab %>%
-        filter(place == "") %>%
-        select(player)
-    
+        filter(!thru %in% as.character(c(1:18, "F", ""))) %>%
+        select(place:total_under, R1 = today_under, R2 = R1, R3 = R2, R4 = R3,
+               total_score = R4) %>%
+        mutate(across(R1:total_score, ~ if_else(.x == "", NA_character_, .x)))
+
     # If the place is either MC or WD then only keep place, player, R1, R2, and
     # total score.
     mc_wd <- leader_tab %>%
@@ -131,7 +139,8 @@ while (TRUE) {
         
         # These rows are okay
         leader_tab %>%
-            filter(!place %in% c("MC", "WD", "")),
+            filter(!place %in% c("MC", "WD", ""),
+                   thru %in% as.character(c(1:18, "F"))),
         
         # These are the rows we had to fix
         not_started,
@@ -147,7 +156,13 @@ while (TRUE) {
             
             # Add a datetime stamp. Google sheets converts all datetimes to UTC,
             # so subtract six hours to show mountain time.
-            last_updated = Sys.time() - hours(6))
+            last_updated = Sys.time() - hours(6),
+            
+            # Need these columns to properly sort the leaderboard
+            place2 = as.integer(str_extract(place, "[0-9]+")),
+            thru2 = as.integer(str_extract(thru, "[0-9]+"))) %>%
+        arrange(place2, desc(thru2)) %>%
+        select(-place2, -thru2)
     
     # Write to Google sheet. If there's an error, print message & continue.
     tryCatch(
