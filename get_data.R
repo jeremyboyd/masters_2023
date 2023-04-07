@@ -1,5 +1,5 @@
 # Author: Jeremy Boyd (jeremyboyd@pm.me)
-# Description: Scrape Masters leaderboard data every 120 seconds and write to a
+# Description: Scrape Masters leaderboard data every 60 seconds and write to a
 # Google sheet.
 
 # Packages
@@ -149,13 +149,17 @@ while (TRUE) {
             # so subtract six hours to show mountain time.
             last_updated = Sys.time() - hours(6))
     
-    # Write to Google sheet
-    write_sheet(
-        data = leaderboard,
-        ss = "1-Mq_xMxERqTPUnSerpig5NU9oDVj4a09KFH1WSSedBw",
-        sheet = "leaderboard")
+    # Write to Google sheet. If there's an error, print message & continue.
+    tryCatch(
+        write_sheet(
+            data = leaderboard,
+            ss = "1-Mq_xMxERqTPUnSerpig5NU9oDVj4a09KFH1WSSedBw",
+            sheet = "leaderboard"),
+        error = function(e) {
+            message("Error in write_sheet()")
+            print(e) })
     
-    # Pause 120 seconds before running loop again
+    # Pause 60 seconds before running loop again
     message("Waiting for next loop...")
-    Sys.sleep(120)
+    Sys.sleep(60)
 }
