@@ -117,20 +117,19 @@ while (TRUE) {
         select(place, player, R1 = thru, R2 = today_under, R3 = R2,
                total_score = R3)
     
-    # If the place isn't MC or WD and thru isn't showing 1-18 or F, then they
-    # haven't started yet and thru is showing their start time.
+    # Players who haven't started have a start time with "GMT" in the thru col
     not_started <- leader_tab %>%
-        filter(!thru %in% as.character(c(1:18, "F", "")),
-               !place %in% c("MC", "WD")) %>%
+        filter(!place %in% c("MC", "WD"),
+               str_detect(thru, "GMT")) %>%
         select(place:total_under, R1 = today_under, R2 = R1, R3 = R2, R4 = R3,
                total_score = R4) %>%
         mutate(across(R1:total_score, ~ if_else(.x == "", NA_character_, .x)))
-
-    # If the place isn't MC or WD and thru is showing 1-18 or F, then they've
-    # started.
+    
+    # If the place isn't MC or WD and thru doesn't have "GMT" then player has
+    # started today's round.
     started <- leader_tab %>%
         filter(!place %in% c("MC", "WD", ""),
-               thru %in% as.character(c(1:18, "F")))
+               !str_detect(thru, "GMT"))
     
     # Final leaderboard
     leaderboard <- bind_rows(
@@ -154,7 +153,7 @@ while (TRUE) {
             place2 = as.integer(str_extract(place, "[0-9]+")),
             thru2 = if_else(
                 thru == "F"
-                , 99
+                ,99
                 ,as.integer(str_extract(thru, "[0-9]+")))) %>%
         arrange(place2, desc(thru2)) %>%
         select(-place2, -thru2)
