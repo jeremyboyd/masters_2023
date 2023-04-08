@@ -51,11 +51,12 @@ message(paste0("Finished navigating to ", url, "."))
 # traditional table, which can then be scraped. Once this process is completed,
 # the page can be refreshed and will stay on the traditional table.
 # Click to open menu
+# NOTE: Starting before R3 the page seems to have switched to defaulting on Traditional, so I had to change the target assignment below to be resHeaders == "Traditional". Ideally there would be logic to handle this automatically--e.g., if the menu is already on Traditional, do nothing; else click menu and switch to Traditional.
 webElems <- remDr$findElements(
     using = "xpath",
     value = '//*[contains(concat( " ", @class, " " ), concat( " ", "center_cell", " " ))]//*[contains(concat( " ", @class, " " ), concat( " ", "navigation_down_arrow", " " ))]')
 resHeaders <- unlist(lapply(webElems, function(x) { x$getElementText() }))
-target <- webElems[[which(resHeaders == "Over/Under")]]
+target <- webElems[[which(resHeaders == "Traditional")]]
 target$clickElement()
 
 # Click to select traditional table
@@ -109,40 +110,31 @@ while (TRUE) {
     # Add column names
     colnames(leader_tab) <- c("place", "player", "total_under", "thru", "today_under", "R1", "R2", "R3", "R4", "total_score")
     
-    # There are different methods for fixing rows, depending on where in the
-    # tournament we are. If there's no place data, then the player hasn't teed
-    # off yet, so only keep their name.
-    # NOTE: Only works for not started round 1
-    # not_started <- leader_tab %>%
-    #     filter(place == "") %>%
-    #     select(player)
-
-    # NOTE: This will only work for R3/4 if the start time stays in thru col
+    # If the place is either MC or WD then only keep place, player, R1, R2, R3,
+    # and total score.
+    mc_wd <- leader_tab %>%
+        filter(place %in% c("MC", "WD")) %>%
+        select(place, player, R1 = thru, R2 = today_under, R3 = R2,
+               total_score = R3)
+    
+    # If the place isn't MC or WD and thru isn't showing 1-18 or F, then they
+    # haven't started yet and thru is showing their start time.
     not_started <- leader_tab %>%
-        filter(!thru %in% as.character(c(1:18, "F", ""))) %>%
+        filter(!thru %in% as.character(c(1:18, "F", "")),
+               !place %in% c("MC", "WD")) %>%
         select(place:total_under, R1 = today_under, R2 = R1, R3 = R2, R4 = R3,
                total_score = R4) %>%
         mutate(across(R1:total_score, ~ if_else(.x == "", NA_character_, .x)))
 
-    # If the place is either MC or WD then only keep place, player, R1, R2, and
-    # total score.
-    mc_wd <- leader_tab %>%
-        filter(place %in% c("MC", "WD")) %>%
-        select(place, player, thru, today_under, R3) %>%
-        rename(
-            R1 = thru,
-            R2 = today_under,
-            total_score = R3)
-
+    # If the place isn't MC or WD and thru is showing 1-18 or F, then they've
+    # started.
+    started <- leader_tab %>%
+        filter(!place %in% c("MC", "WD", ""),
+               thru %in% as.character(c(1:18, "F")))
+    
     # Final leaderboard
     leaderboard <- bind_rows(
-        
-        # These rows are okay
-        leader_tab %>%
-            filter(!place %in% c("MC", "WD", ""),
-                   thru %in% as.character(c(1:18, "F"))),
-        
-        # These are the rows we had to fix
+        started,
         not_started,
         mc_wd) %>%
         
