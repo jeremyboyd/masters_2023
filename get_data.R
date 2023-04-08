@@ -160,7 +160,10 @@ while (TRUE) {
             
             # Need these columns to properly sort the leaderboard
             place2 = as.integer(str_extract(place, "[0-9]+")),
-            thru2 = as.integer(str_extract(thru, "[0-9]+"))) %>%
+            thru2 = if_else(
+                thru == "F"
+                , 99
+                ,as.integer(str_extract(thru, "[0-9]+")))) %>%
         arrange(place2, desc(thru2)) %>%
         select(-place2, -thru2)
     
