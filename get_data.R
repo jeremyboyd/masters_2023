@@ -27,7 +27,7 @@ system("open --background -a Docker", wait = TRUE)
 Sys.sleep(40)
 message("Finished starting Docker.")
 
-# Start Selenium
+# Start Selenium container on Docker
 system("docker run -d -p 4445:4444 selenium/standalone-firefox", wait = TRUE)
 message("Finished starting Selenium server.")
 
@@ -43,31 +43,31 @@ remDr$navigate(url)
 Sys.sleep(5)
 message(paste0("Finished navigating to ", url, "."))
 
-# The leaderboard page has two different types of boards: "Traditional" (which
-# is what we want), and "Over/Under". When the page first loads, it's set to
-# Over/Under. The code below (1) finds the drop-down menu that controls the type
-# of leaderboard and clicks it to reveal the "Over/Under" and "Traditional"
-# options, then (2) finds the "Traditional" option and clicks it. This loads the
-# traditional table, which can then be scraped. Once this process is completed,
-# the page can be refreshed and will stay on the traditional table.
-# Click to open menu
-# NOTE: Starting before R3 the page seems to have switched to defaulting on Traditional, so I had to change the target assignment below to be resHeaders == "Traditional". Ideally there would be logic to handle this automatically--e.g., if the menu is already on Traditional, do nothing; else click menu and switch to Traditional.
+# The leaderboard page has a drop-down menu that's used to control which type of
+# leaderboard is displayed: Traditional (which is what we want), and Over/Under.
+# If Over/Under is currently being displayed, switch to Traditional.
+# Get current drop-down setting
 webElems <- remDr$findElements(
     using = "xpath",
     value = '//*[contains(concat( " ", @class, " " ), concat( " ", "center_cell", " " ))]//*[contains(concat( " ", @class, " " ), concat( " ", "navigation_down_arrow", " " ))]')
 resHeaders <- unlist(lapply(webElems, function(x) { x$getElementText() }))
-target <- webElems[[which(resHeaders == "Traditional")]]
-target$clickElement()
 
-# Click to select traditional table
-webElems <- remDr$findElements(
-    using = "xpath",
-    value = '//*[contains(concat( " ", @class, " " ), concat( " ", "option", " " )) and (((count(preceding-sibling::*) + 1) = 2) and parent::*)]')
-resHeaders <- unlist(lapply(webElems, function(x) { x$getElementText() }))
-target <- webElems[[which(resHeaders == "Traditional")]]
-target$clickElement()
+# If drop-down is currently set to Over/Under, switch to Traditional
+if(resHeaders == "Over/Under") {
+    
+    # Click drop-down
+    target <- webElems[[which(resHeaders == "Over/Under")]]
+    target$clickElement()
+    
+    # Click to select traditional table
+    webElems <- remDr$findElements(
+        using = "xpath",
+        value = '//*[contains(concat( " ", @class, " " ), concat( " ", "option", " " )) and (((count(preceding-sibling::*) + 1) = 2) and parent::*)]')
+    resHeaders <- unlist(lapply(webElems, function(x) { x$getElementText() }))
+    target <- webElems[[which(resHeaders == "Traditional")]]
+    target$clickElement() }
 
-# Scrape leaderboard every 10 minutes and send to Google sheet
+# Scrape leaderboard every 60 seconds and write to Google sheet
 while (TRUE) {
     
     # User message
